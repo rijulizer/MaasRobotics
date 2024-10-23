@@ -1,0 +1,7 @@
+Robot-1: 4 wheel robot (Sam)
+    1. Basic hardware and mobile robot
+    2. Edge detection with IR sensor: does not fall off from table
+    3. Collision Avoidanace with Ultra Sonic sensor
+    4. Object Detection with Ultra Sonic and then camera sensor
+    5. SLAM with camera + IMU
+    6. Autonomous Driving
