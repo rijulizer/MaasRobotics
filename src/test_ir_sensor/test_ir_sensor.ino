@@ -1,7 +1,7 @@
 #include "IRSensor.h"
 
 IRSensor IRSensorL(28, 140);
-IRSensor IRSensorR(27, 140);
+IRSensor IRSensorR(26, 140);
 
 
 void setup() {
