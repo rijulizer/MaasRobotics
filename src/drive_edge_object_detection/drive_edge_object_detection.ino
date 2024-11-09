@@ -6,13 +6,15 @@
 const int trigPin = 36; //PC5 36
 const int echoPin = 37; //PC4 37 
 const long us_threshold = 20; 
-const long ir_threshold = 200;
+const long ir_thresholdLeft = 200;
+const long ir_thresholdRight = 400;
 const unsigned long reverseDuration = 20;
 const unsigned long turnDuration = 450;
 USSensor USSensorF(trigPin, echoPin, us_threshold);
 
 // Instantiate IR sensors (using only left IR sensor since right one is broken)
-IRSensor IRSensorL(28, ir_threshold); // PE2 28
+IRSensor IRSensorL(28, ir_thresholdLeft); // PE2 28
+IRSensor IRSensorR(26, ir_thresholdRight); //PE3 26
 
 unsigned long previousMillis = 0;
 unsigned long actionStartTime = 0;
@@ -30,20 +32,21 @@ void setup() {
 
 void loop() {
   unsigned long currentMillis = millis();  // Get the current time
-  
   // Check sensors
-  bool isEdgeDetected = IRSensorL.edgeDetected(); // Only use the left IR sensor
+  bool isEdgeDetectedLeft = IRSensorL.edgeDetected();
+  bool isEdgeDetectedRight = IRSensorR.edgeDetected();
   bool isObjectDetected = USSensorF.objectDetected(); // Ultrasonic front sensor
-  
   switch (currentState) {
     case MOVING_FORWARD:
-      if (isEdgeDetected || isObjectDetected) {
-        Serial.println("IR left sensor: ");
-        Serial.println(isEdgeDetected);
-        Serial.println("US sensor: ");
-        Serial.println(isObjectDetected);
+      if (isEdgeDetectedLeft || isEdgeDetectedRight || isObjectDetected) {
         // Edge or object detected, start reversing
         Serial.println("Object/Edge Detected, reversing!");
+        Serial.println("R");
+        Serial.println(isEdgeDetectedRight);
+        Serial.println("L");
+        Serial.println(isEdgeDetectedLeft);
+        Serial.println("USS");
+        Serial.println(isObjectDetected);
         currentState = REVERSING;
         actionStartTime = currentMillis;
         driveBackward(255);  // Reverse at full speed
@@ -52,7 +55,8 @@ void loop() {
         if (currentMillis - previousMillis >= interval) {
           // Update the previous time stamp
           previousMillis = currentMillis;
-          driveForward(100);  // Keep moving forward at speed 100
+          driveForward(110);
+          driveForward(70);  // Keep moving forward at speed x
           Serial.println("Clean road ahead, moving forward.");
         }
       }
@@ -71,13 +75,20 @@ void loop() {
 
     case STOPPED:
       // After stopping, resume moving forward if no obstacle is in the way
-      if (isEdgeDetected) {
+      if (isEdgeDetectedLeft || isEdgeDetectedRight) {
+        Serial.println("Right detected");
+        Serial.println(isEdgeDetectedRight);
         // Edge or object detected, start reversing
         driveBackward(120);
         delay(500);
-        turnRight(180);
+        if(isEdgeDetectedLeft){
+          turnRight(180);
+        }else{
+          turnLeft(180);  
+        }
         delay(turnDuration);
       }else if (isObjectDetected) {
+        Serial.println("USS detected object!");
         // Edge or object detected, start reversing
         driveBackward(120);
         delay(340);
