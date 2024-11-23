@@ -1,8 +1,17 @@
 #include "esp_camera.h"
 #include <WiFi.h>
 #include <WebServer.h>
+#include "ESP32Servo.h"
+#include <HardwareSerial.h>
+
 // define the board
 #define CAMERA_MODEL_AI_THINKER // Has PSRAM
+#define SERVO_PIN 12
+// remap the open pins
+#define TX_PIN 14  // Pin for TX (connect to RX of the microcontroller)
+#define RX_PIN 15  // Pin for RX (optional, for bidirectional communication)
+HardwareSerial MCSerial(2); // Use Serial1 for UART communication
+
 #include "camera_pins.h"
 // define id,password
 const char *ssid = "ESP_AP";
@@ -16,11 +25,16 @@ void startCameraServer();
 void setupLedFlash(int pin);
 // setup http server at port 82
 WebServer server(82);
+// Create the servo object
+Servo servo_cam;
+
 
 void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(true);
   Serial.println();
+  // start a serial UART to communicate with microcontroller
+  MCSerial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
 
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -114,7 +128,8 @@ void setup() {
   server.on("/", handle_OnConnect);
   server.onNotFound(handle_NotFound);
   server.on("/test_get", handle_TestGet);
-  server.on("/test_put", handle_TestPost);
+  server.on("/test_post", handle_TestPost);
+  server.on("/control_servo", servo_control);
   // start camera server
   startCameraServer();
   // start http server
@@ -124,6 +139,11 @@ void setup() {
   // Serial.print(WiFi.localIP());
   Serial.print(local_ip);
   Serial.println("' to connect");
+  // attach servo pin
+  servo_cam.attach(SERVO_PIN);
+  servo_cam.write(60);
+  Serial.print("Servo connected to pin: ");
+  Serial.print(SERVO_PIN);
 
 }
 void handle_OnConnect() {
@@ -138,7 +158,13 @@ void handle_NotFound() {
 
 void handle_TestGet() {
   Serial.println("GET request received on /test_get");
-  server.send(200, "text/plain", "GET request successful! Here is your response.");
+  String received_data = "GET request successful! Here is your response.";
+  // receive data via UART
+  if (MCSerial.available() > 0){
+    received_data = MCSerial.readString();
+    Serial.print(received_data);
+  }
+  server.send(200, "text/plain", received_data);
 }
 
 void handle_TestPost() {
@@ -149,10 +175,24 @@ void handle_TestPost() {
   Serial.println("POST Body:");
   Serial.println(body);
   
+  // Send the data via UART
+  MCSerial.println(String(body));
+  Serial.println("Data sent to the microcontroller via UART.");
   // Send response
   server.send(200, "text/plain", "POST request received and processed. Data:\n" + body);
 }
-
+void servo_control(){
+  // rotate the motor clockwise
+  servo_cam.write(50);
+  delay(1000);
+  // rotate the motor counter-clockwise
+  servo_cam.write(70);
+  delay(1000);
+   // bring back to center
+  servo_cam.write(60);
+  delay(1000);
+  server.send(200);
+}
 void loop() {
   // Do nothing. Everything is done in another task by the web server
   server.handleClient();
