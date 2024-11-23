@@ -1,10 +1,15 @@
 #include "motorControl.h"
 #include "IRSensor.h"
 #include "USSensor.h"
+#include "Servo.h"
+
+// Create the servo object
+Servo myservo;
+int servo_pin = 23; // PD0
 
 // Instantiate US sensors
-const int trigPin = 36; //PC5 36
-const int echoPin = 37; //PC4 37 
+const int trigPin = 11; //PA2 11
+const int echoPin = 31; //PF4 31 
 const long us_threshold = 20; 
 const long ir_thresholdLeft = 200;
 const long ir_thresholdRight = 400;
@@ -25,12 +30,20 @@ RobotState currentState = MOVING_FORWARD;
 
 void setup() {
   Serial.begin(9600); 
+  myservo.attach(servo_pin); // attach the servo to our servo object
+  myservo.write(90);
   motorInit();  // Initialize motor control pins
   driveForward(100);  // Start moving forward initially
   Serial.println("Robot initialized, moving forward.");
 }
 
 void loop() {
+  //myservo.write(50);
+  //delay(1000);
+  //myservo.write(70);
+  //delay(1000);
+  //myservo.write(60);
+  
   unsigned long currentMillis = millis();  // Get the current time
   // Check sensors
   bool isEdgeDetectedLeft = IRSensorL.edgeDetected();

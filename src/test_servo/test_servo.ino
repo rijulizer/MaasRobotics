@@ -15,9 +15,15 @@ void setup() {
 void loop() {
   //Serial.print(analogRead(pinNb));
   
-  myservo.write(80); // rotate the motor clockwise
-  delay(1000); // keep rotating for 1 seconds (1000 milliseconds)
+  //myservo.write(0); // rotate the motor clockwise
+  //delay(2000); // keep rotating for 1 seconds (1000 milliseconds)
 
-  myservo.write(106); // rotate the motor counter-clockwise
-  delay(1000); //
+  myservo.write(80); // rotate the motor counter-clockwise
+  delay(2000); //
+
+  myservo.write(100); // rotate the motor counter-clockwise
+  delay(2000); //
+
+  //myservo.write(180); // rotate the motor counter-clockwise
+  //delay(2000); //
 }
