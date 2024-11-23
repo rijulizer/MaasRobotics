@@ -1,28 +1,22 @@
-int incomingByte = 0; // for incoming serial data
-
+// Energia Sketch for EK-TM4C123GXL
 void setup() {
-  Serial.begin(9600); // opens serial port, sets data rate to 9600 bps
+  // Initialize UART2 on PD6 for receiving data
+  Serial2.begin(9600); // UART2 (PD6 = RX) baud rate must match ESP32's Serial baud rate
+
+  // Initialize Serial Monitor (connected via UART0)
+  Serial.begin(9600);  // UART0 for USB Serial Monitor
+  Serial.println("Ready to receive data from ESP32-CAM on PD6...");
 }
 
 void loop() {
-  //Serial.write(45); // send a byte with the value 45
+  // Check if data is available on UART2
+  if (Serial2.available() > 0) {
+    String receivedData = "";
 
-  //int bytesSent = Serial.write("hello\n");  //send the string “hello” and return the length of the string.
-  // send data only when you receive data:
-  //Serial.println(Serial.available());
-  // read the incoming byte:
-    incomingByte = Serial.read();
-
-    // say what you got:
-    Serial.println("I received: ");
-    Serial.println(incomingByte, DEC);
-  /*if (Serial.available() > 0) {
-    // read the incoming byte:
-    incomingByte = Serial.read();
-
-    // say what you got:
-    Serial.println("I received: ");
-    Serial.println();
-    Serial.println(incomingByte, DEC);
-  }*/
+    // Read the incoming string until a newline character or timeout
+    while (Serial2.available() > 0) {
+      Serial.println(Serial2.readString()); // Read one character from UART2 
+      delay(5);                // Small delay for stable data reception
+    }
+  }
 }
