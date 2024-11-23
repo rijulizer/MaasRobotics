@@ -1,21 +1,45 @@
 #include "esp_camera.h"
 #include <WiFi.h>
-#include <WebServer.h>
-// define the board
+
+//
+// WARNING!!! PSRAM IC required for UXGA resolution and high JPEG quality
+//            Ensure ESP32 Wrover Module or other board with PSRAM is selected
+//            Partial images will be transmitted if image exceeds buffer size
+//
+//            You must select partition scheme from the board menu that has at least 3MB APP space.
+//            Face Recognition is DISABLED for ESP32 and ESP32-S2, because it takes up from 15
+//            seconds to process single frame. Face Detection is ENABLED if PSRAM is enabled as well
+
+// ===================
+// Select camera model
+// ===================
+
+// #define CAMERA_MODEL_ESP_EYE  // Has PSRAM
+// #define CAMERA_MODEL_ESP32S3_EYE // Has PSRAM
+// #define CAMERA_MODEL_M5STACK_PSRAM // Has PSRAM
+//#define CAMERA_MODEL_M5STACK_V2_PSRAM // M5Camera version B Has PSRAM
+//#define CAMERA_MODEL_M5STACK_WIDE // Has PSRAM
+//#define CAMERA_MODEL_M5STACK_ESP32CAM // No PSRAM
+//#define CAMERA_MODEL_M5STACK_UNITCAM // No PSRAM
+//#define CAMERA_MODEL_M5STACK_CAMS3_UNIT  // Has PSRAM
 #define CAMERA_MODEL_AI_THINKER // Has PSRAM
 #include "camera_pins.h"
-// define id,password
+
+// ===========================
+// Enter your WiFi credentials
+// ===========================
+// const char *ssid = "Meerssenerweg 55";
+// const char *password = "ThePassword69";
+// #R Access point mode
 const char *ssid = "ESP_AP";
 const char *password = "12345678";
-// define ip, gateway and subnet
+
 IPAddress local_ip(192,168,1,1);
 IPAddress gateway(192,168,1,1);
 IPAddress subnet(255,255,255,0);
-// setup camera server
+
 void startCameraServer();
 void setupLedFlash(int pin);
-// setup http server at port 82
-WebServer server(82);
 
 void setup() {
   Serial.begin(115200);
@@ -107,54 +131,30 @@ void setup() {
 #if defined(LED_GPIO_NUM)
   setupLedFlash(LED_GPIO_NUM);
 #endif
+  // Router Mode
+  // WiFi.begin(ssid, password);
+  // WiFi.setSleep(false);
+
+  // while (WiFi.status() != WL_CONNECTED) {
+  //   delay(500);
+  //   Serial.print(".");
+  // }
+  // Serial.println("");
+  // Serial.println("WiFi connected");
+
+  // startCameraServer();
   // Accesspoint mode
   WiFi.softAP(ssid, password);
   WiFi.softAPConfig(local_ip, gateway, subnet);
-  // webserver related code
-  server.on("/", handle_OnConnect);
-  server.onNotFound(handle_NotFound);
-  server.on("/test_get", handle_TestGet);
-  server.on("/test_put", handle_TestPost);
-  // start camera server
   startCameraServer();
-  // start http server
-  server.begin();
 
-  Serial.print("Camera + HTTP server started! Use 'http://");
+  Serial.print("Camera Ready! Use 'http://");
   // Serial.print(WiFi.localIP());
   Serial.print(local_ip);
   Serial.println("' to connect");
-
-}
-void handle_OnConnect() {
-  Serial.println("Client connected to the server.");
-  server.send(200, "text/plain", "Welcome to the ESP32-CAM!");
-}
-
-void handle_NotFound() {
-  Serial.println("404: Not Found. A client tried accessing a non-existent route.");
-  server.send(404, "text/plain", "404: Not Found");
-}
-
-void handle_TestGet() {
-  Serial.println("GET request received on /test_get");
-  server.send(200, "text/plain", "GET request successful! Here is your response.");
-}
-
-void handle_TestPost() {
-  Serial.println("POST request received on /test_post");
-  
-  // Read the POST body data
-  String body = server.arg("plain");
-  Serial.println("POST Body:");
-  Serial.println(body);
-  
-  // Send response
-  server.send(200, "text/plain", "POST request received and processed. Data:\n" + body);
 }
 
 void loop() {
   // Do nothing. Everything is done in another task by the web server
-  server.handleClient();
   delay(10000);
 }
