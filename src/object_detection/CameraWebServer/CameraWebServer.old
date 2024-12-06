@@ -6,13 +6,13 @@
 
 // define the board
 #define CAMERA_MODEL_AI_THINKER // Has PSRAM
-
+#define SERVO_PIN 12
 // remap the open pins
 #define TX_PIN 14  // Pin for TX (connect to RX of the microcontroller)
 #define RX_PIN 15  // Pin for RX (optional, for bidirectional communication)
 HardwareSerial MCSerial(2); // Use Serial1 for UART communication
-#include "camera_pins.h"
 
+#include "camera_pins.h"
 // define id,password
 const char *ssid = "ESP_AP";
 const char *password = "12345678";
@@ -27,13 +27,14 @@ void setupLedFlash(int pin);
 WebServer server(82);
 // Create the servo object
 Servo servo_cam;
-#define SERVO_PIN 12
 
 
 void setup() {
   Serial.begin(115200);
   Serial.setDebugOutput(true);
   Serial.println();
+  // start a serial UART to communicate with microcontroller
+  MCSerial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
 
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -78,7 +79,15 @@ void setup() {
   } else {
     // Best option for face detection/recognition
     config.frame_size = FRAMESIZE_240X240;
+#if CONFIG_IDF_TARGET_ESP32S3
+    config.fb_count = 2;
+#endif
   }
+
+#if defined(CAMERA_MODEL_ESP_EYE)
+  pinMode(13, INPUT_PULLUP);
+  pinMode(14, INPUT_PULLUP);
+#endif
 
   // camera init
   esp_err_t err = esp_camera_init(&config);
@@ -99,18 +108,22 @@ void setup() {
     s->set_framesize(s, FRAMESIZE_QVGA);
   }
 
+#if defined(CAMERA_MODEL_M5STACK_WIDE) || defined(CAMERA_MODEL_M5STACK_ESP32CAM)
+  s->set_vflip(s, 1);
+  s->set_hmirror(s, 1);
+#endif
+
+#if defined(CAMERA_MODEL_ESP32S3_EYE)
+  s->set_vflip(s, 1);
+#endif
+
 // Setup LED FLash if LED pin is defined in camera_pins.h
-  if defined(LED_GPIO_NUM){
-    setupLedFlash(LED_GPIO_NUM);
-  }
-  
+#if defined(LED_GPIO_NUM)
+  setupLedFlash(LED_GPIO_NUM);
+#endif
   // Accesspoint mode
   WiFi.softAP(ssid, password);
   WiFi.softAPConfig(local_ip, gateway, subnet);
-
-  // start a serial UART to communicate with microcontroller
-  MCSerial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
-
   // webserver related code
   server.on("/", handle_OnConnect);
   server.onNotFound(handle_NotFound);
@@ -121,6 +134,7 @@ void setup() {
   startCameraServer();
   // start http server
   server.begin();
+
   Serial.print("Camera + HTTP server started! Use 'http://");
   // Serial.print(WiFi.localIP());
   Serial.print(local_ip);
@@ -172,7 +186,7 @@ void servo_control(){
   servo_cam.write(50);
   delay(1000);
   // rotate the motor counter-clockwise
-  servo_cam.write(70);
+  servo_cam.write(70);`
   delay(1000);
    // bring back to center
   servo_cam.write(60);

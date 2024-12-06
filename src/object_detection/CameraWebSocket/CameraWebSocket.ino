@@ -1,33 +1,46 @@
 #include "esp_camera.h"
 #include <WiFi.h>
-#include <WebServer.h>
+// #include <WebServer.h>
+#include <WebSocketsClient.h>
 #include "ESP32Servo.h"
 #include <HardwareSerial.h>
 
 // define the board
 #define CAMERA_MODEL_AI_THINKER // Has PSRAM
+#include "camera_pins.h"
 
 // remap the open pins
 #define TX_PIN 14  // Pin for TX (connect to RX of the microcontroller)
 #define RX_PIN 15  // Pin for RX (optional, for bidirectional communication)
 HardwareSerial MCSerial(2); // Use Serial1 for UART communication
-#include "camera_pins.h"
+
 
 // define id,password
 const char *ssid = "ESP_AP";
 const char *password = "12345678";
+
 // define ip, gateway and subnet
 IPAddress local_ip(192,168,1,1);
 IPAddress gateway(192,168,1,1);
 IPAddress subnet(255,255,255,0);
-// setup camera server
-void startCameraServer();
-void setupLedFlash(int pin);
-// setup http server at port 82
-WebServer server(82);
+
+// Websocket Server 
+// step1: check the ip assigned to the laptop after connecting to the esp AP
+// step2: create  websocket server in that host set it (0.0.0.0)
+// step3: Client should listen to that address
+const char* websocket_server = "192.168.1.2";
+const uint16_t websocket_port = 8000;
+
 // Create the servo object
 Servo servo_cam;
 #define SERVO_PIN 12
+
+// Websocket client
+WebSocketsClient webSocket;
+
+// Function prototypes
+void takeSnapsSend();
+void handleWebSocketMessage(const char* message);
 
 
 void setup() {
@@ -99,49 +112,61 @@ void setup() {
     s->set_framesize(s, FRAMESIZE_QVGA);
   }
 
-// Setup LED FLash if LED pin is defined in camera_pins.h
-  if defined(LED_GPIO_NUM){
-    setupLedFlash(LED_GPIO_NUM);
-  }
-  
-  // Accesspoint mode
+  // Wi-Fi connection -- Accesspoint mode
   WiFi.softAP(ssid, password);
   WiFi.softAPConfig(local_ip, gateway, subnet);
+  Serial.println("\nWiFi connected...");
+  Serial.println(WiFi.softAPIP());
 
   // start a serial UART to communicate with microcontroller
   MCSerial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
+  Serial.println("Second Serial communication started");
 
-  // webserver related code
-  server.on("/", handle_OnConnect);
-  server.onNotFound(handle_NotFound);
-  server.on("/test_get", handle_TestGet);
-  server.on("/test_post", handle_TestPost);
-  server.on("/control_servo", servo_control);
-  // start camera server
-  startCameraServer();
-  // start http server
-  server.begin();
-  Serial.print("Camera + HTTP server started! Use 'http://");
-  // Serial.print(WiFi.localIP());
-  Serial.print(local_ip);
-  Serial.println("' to connect");
   // attach servo pin
   servo_cam.attach(SERVO_PIN);
   servo_cam.write(60);
   Serial.print("Servo connected to pin: ");
   Serial.print(SERVO_PIN);
+  
+  // Initialize WebSocket
+  webSocket.begin(websocket_server, websocket_port, "/");
+  webSocket.onEvent([](WStype_t type, uint8_t* payload, size_t length) {
+    switch (type) {
+      case WStype_CONNECTED:
+        Serial.println("WebSocket connected");
+        break;
+      case WStype_TEXT:
+        Serial.printf("Received message: %s\n", payload);
+        handleWebSocketMessage((const char*)payload);
+        break;
+      case WStype_DISCONNECTED:
+        Serial.println("WebSocket disconnected");
+        break;
+      default:
+        break;
+    }
+  });
+}
+
+void loop() {
+  // Do nothing. Everything is done in another task by the web server
+  webSocket.loop();
+}
+
+void handleWebSocketMessage(const char* message) {
+  if (strcmp(message, "servo_control") == 0) {
+    servo_control();
+  } else if (strcmp(message, "take_snap") == 0) {
+    takeSnapsSend();
+  } else if (strcmp(message, "test_get") == 0) {
+    handle_TestGet();
+  } else if (strcmp(message, "test_post") == 0) {
+    handle_TestPost();
+  } else {
+    Serial.println("Unknown message received");
+  }
 
 }
-void handle_OnConnect() {
-  Serial.println("Client connected to the server.");
-  server.send(200, "text/plain", "Welcome to the ESP32-CAM!");
-}
-
-void handle_NotFound() {
-  Serial.println("404: Not Found. A client tried accessing a non-existent route.");
-  server.send(404, "text/plain", "404: Not Found");
-}
-
 void handle_TestGet() {
   Serial.println("GET request received on /test_get");
   String received_data = "GET request successful! Here is your response.";
@@ -150,22 +175,22 @@ void handle_TestGet() {
     received_data = MCSerial.readString();
     Serial.print(received_data);
   }
-  server.send(200, "text/plain", received_data);
+  // server.send(200, "text/plain", received_data);
 }
 
 void handle_TestPost() {
   Serial.println("POST request received on /test_post");
   
   // Read the POST body data
-  String body = server.arg("plain");
+  // String body = server.arg("plain");
   Serial.println("POST Body:");
-  Serial.println(body);
+  // Serial.println(body);
   
   // Send the data via UART
-  MCSerial.println(String(body));
+  // MCSerial.println(String(body));
   Serial.println("Data sent to the microcontroller via UART.");
   // Send response
-  server.send(200, "text/plain", "POST request received and processed. Data:\n" + body);
+  // server.send(200, "text/plain", "POST request received and processed. Data:\n" + body);
 }
 void servo_control(){
   // rotate the motor clockwise
@@ -177,10 +202,18 @@ void servo_control(){
    // bring back to center
   servo_cam.write(60);
   delay(1000);
-  server.send(200);
+  // server.send(200);
 }
-void loop() {
-  // Do nothing. Everything is done in another task by the web server
-  server.handleClient();
-  delay(10000);
+// Take a snapshot and send it via WebSocket
+void takeSnapsSend() {
+  camera_fb_t* fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("Camera capture failed");
+    return;
+  }
+  // Send image as binary data
+  webSocket.sendBIN(fb->buf, fb->len);
+  Serial.println("Image sent to server...");
+  // Return the frame buffer
+  esp_camera_fb_return(fb);
 }
