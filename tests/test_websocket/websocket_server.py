@@ -34,6 +34,34 @@ async def broadcast(message):
         )
 
 
+# Function to handle and display image if received
+async def handle_image(websocket, image_data):
+    print("Image received")
+    try:
+        # Convert the received binary data into an image
+        image = Image.open(BytesIO(image_data))
+        # logger.info(f"Received and saved image: {filename}")
+        logger.info(f"Image details:")
+        logger.info(f"  - Format: {image.format}")
+        logger.info(f"  - Size: {image.size}")
+        logger.info(f"  - Mode: {image.mode}")
+        # # Generate a unique filename
+        # filename = os.path.join(
+        #     UPLOAD_FOLDER,
+        #     f"received_image_{len(os.listdir(UPLOAD_FOLDER)) + 1}{file_ext}",
+        # )
+        # # Open and display image details using Pillow
+        # with Image.open(filename) as img:
+        # # Save the image
+        # with open(filename, "wb") as f:
+        #     f.write(image_data)
+
+        # Display the image using Pillow
+        image.show()
+    except Exception as e:
+        print(f"Error displaying image: {e}")
+
+
 async def handle_client(websocket):
     """
     Handle individual client connections.
@@ -45,53 +73,13 @@ async def handle_client(websocket):
         connected_clients.add(websocket)
         logger.info(f"New client connected. Total clients: {len(connected_clients)}")
 
-        # Send a welcome message to the connecting client
-        await websocket.send("Welcome to the WebSocket server!")
-
-        # Broadcast new client connection
-        # await broadcast(
-        #     f"A new client has connected. Total clients: {len(connected_clients)}"
-        # )
-
         # Handle incoming messages
         async for message in websocket:
             try:
-                # Check if the message is a base64 encoded image
-                if message.startswith("data:image"):
-                    # Split the base64 string
-                    header, encoded = message.split(",", 1)
-
-                    # Determine file extension from the header
-                    if "png" in header:
-                        file_ext = ".png"
-                    elif "jpeg" in header or "jpg" in header:
-                        file_ext = ".jpg"
-                    else:
-                        file_ext = ".img"
-
-                    # Decode the base64 image
-                    image_data = base64.b64decode(encoded)
-
-                    # Generate a unique filename
-                    filename = os.path.join(
-                        UPLOAD_FOLDER,
-                        f"received_image_{len(os.listdir(UPLOAD_FOLDER)) + 1}{file_ext}",
-                    )
-
-                    # Save the image
-                    with open(filename, "wb") as f:
-                        f.write(image_data)
-
-                    # Open and display image details using Pillow
-                    with Image.open(filename) as img:
-                        logger.info(f"Received and saved image: {filename}")
-                        logger.info(f"Image details:")
-                        logger.info(f"  - Format: {img.format}")
-                        logger.info(f"  - Size: {img.size}")
-                        logger.info(f"  - Mode: {img.mode}")
-
-                    # Broadcast image receipt to all clients
-                    await broadcast(f"Image received and saved: {filename}")
+                # Check if the message is binary (image data)
+                if isinstance(message, bytes):
+                    logger.info(f"Received Image")
+                    await handle_image(websocket, message)
 
                 else:
                     # Handle plain text message
