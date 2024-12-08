@@ -158,6 +158,8 @@ void handleWebSocketMessage(const char* message) {
     servo_control();
   } else if (strcmp(message, "take_snap") == 0) {
     takeSnapsSend();
+  } else if (strcmp(message, "get_bot_data") == 0) {
+    botDataSend();
   } else if (strcmp(message, "test_get") == 0) {
     handle_TestGet();
   } else if (strcmp(message, "test_post") == 0) {
@@ -166,31 +168,6 @@ void handleWebSocketMessage(const char* message) {
     Serial.println("Unknown message received");
   }
 
-}
-void handle_TestGet() {
-  Serial.println("GET request received on /test_get");
-  String received_data = "GET request successful! Here is your response.";
-  // receive data via UART
-  if (MCSerial.available() > 0){
-    received_data = MCSerial.readString();
-    Serial.print(received_data);
-  }
-  // server.send(200, "text/plain", received_data);
-}
-
-void handle_TestPost() {
-  Serial.println("POST request received on /test_post");
-  
-  // Read the POST body data
-  // String body = server.arg("plain");
-  Serial.println("POST Body:");
-  // Serial.println(body);
-  
-  // Send the data via UART
-  // MCSerial.println(String(body));
-  Serial.println("Data sent to the microcontroller via UART.");
-  // Send response
-  // server.send(200, "text/plain", "POST request received and processed. Data:\n" + body);
 }
 void servo_control(){
   // rotate the motor clockwise
@@ -216,4 +193,37 @@ void takeSnapsSend() {
   Serial.println("Image sent to server...");
   // Return the frame buffer
   esp_camera_fb_return(fb);
+}
+void botDataSend() {
+  // Send data to the microcontroller via UART
+  // MCSerial.println("Data sent to the microcontroller via UART.");
+  String botData = "Sample Bot Data...";
+  webSocket.sendTXT(botData.c_str());
+  Serial.println("Data sent to Websocket Server.");
+}
+
+void handle_TestGet() {
+  Serial.println("GET request received.");
+  String received_data = "GET request successful! Here is your response.";
+  // receive data via UART
+  if (MCSerial.available() > 0){
+    received_data = MCSerial.readString();
+    Serial.print(received_data);
+  }
+  // server.send(200, "text/plain", received_data);
+}
+
+void handle_TestPost() {
+  Serial.println("POST request received.");
+  
+  // Read the POST body data
+  // String body = server.arg("plain");
+  Serial.println("POST Body:");
+  // Serial.println(body);
+  
+  // Send the data via UART
+  // MCSerial.println(String(body));
+  Serial.println("Data sent to the microcontroller via UART.");
+  // Send response
+  // server.send(200, "text/plain", "POST request received and processed. Data:\n" + body);
 }
