@@ -1,6 +1,7 @@
 #include "IMU.h"
 #include "Energia.h"
 #include "Wire.h"
+
 /*
    Arduino and MPU6050 Accelerometer and Gyroscope Sensor Tutorial
    by Dejan, https://howtomechatronics.com
@@ -10,7 +11,10 @@
 
 // Constructor
 IMU::IMU() {
-  Serial.begin(9600);
+  
+}
+
+void IMU::initialize(){
   Wire.begin();                      // Initialize comunication
   Wire.beginTransmission(MPU);       // Start communication with MPU6050 // MPU=0x68
   Wire.write(0x6B);                  // Talk to the register 6B
@@ -34,8 +38,7 @@ IMU::IMU() {
   delay(20);
 }
 
-
-char* IMU::get_data() {
+float* IMU::get_data() {
   roll = 0.0;
   pitch = 0.0;
   yaw = 0.0;
@@ -49,9 +52,9 @@ char* IMU::get_data() {
   AccX = (Wire.read() << 8 | Wire.read()) / accRange; // X-axis value
   AccY = (Wire.read() << 8 | Wire.read()) / accRange; // Y-axis value
   AccZ = (Wire.read() << 8 | Wire.read()) / accRange; // Z-axis value
-  Serial.print("  AccX = ");Serial.print(AccX);
+  /*Serial.print("  AccX = ");Serial.print(AccX);
   Serial.print("  AccY = ");Serial.print(AccY);
-  Serial.print("  AccZ = ");Serial.print(AccZ);
+  Serial.print("  AccZ = ");Serial.print(AccZ);*/
   // Calculating Roll and Pitch from the accelerometer data
   accAngleX = (atan(AccY / sqrt(pow(AccX, 2) + pow(AccZ, 2))) * 180 / PI) - AccErrorX; // AccErrorX See the calculate_IMU_error()custom function for more details
   accAngleY = (atan(-1 * AccX / sqrt(pow(AccY, 2) + pow(AccZ, 2))) * 180 / PI) - AccErrorY; // AccErrorY
@@ -67,10 +70,10 @@ char* IMU::get_data() {
   GyroX = (Wire.read() << 8 | Wire.read()) / gyroRange; // For a 250deg/s range we have to divide first the raw value by 131.0, according to the datasheet
   GyroY = (Wire.read() << 8 | Wire.read()) / gyroRange;
   GyroZ = (Wire.read() << 8 | Wire.read()) / gyroRange;
-  Serial.print("  GyroX = ");Serial.print(GyroX);
+  /*Serial.print("  GyroX = ");Serial.print(GyroX);
   Serial.print("  GyroY = ");Serial.print(GyroY);
   Serial.print("  GyroZ = ");Serial.print(GyroZ);
-  Serial.print(" ");
+  Serial.print(" ");*/
 
   // Correct the outputs with the calculated error values
   GyroX = GyroX - GyroErrorX; // GyroErrorX 
@@ -85,54 +88,72 @@ char* IMU::get_data() {
   pitch = 0.96 * gyroAngleY + 0.04 * accAngleY;
   
   // Print the values on the serial monitor
-  Serial.print(roll);
+  /*Serial.print(roll);
   Serial.print("/");
   Serial.print(pitch);
   Serial.print("/");
-  Serial.println(yaw);
-
+  Serial.println(yaw);*/
   // Assuming sensor data is already calculated
-  char* jsonData = getSensorDataJson(AccX, AccY, AccZ, GyroX, GyroY, GyroZ, roll, pitch, yaw);
-  
-  if (jsonData != NULL) {
-    Serial.println(jsonData); // Print the JSON string
-    free(jsonData); // Free the allocated memory after use
-  }else{
-    return jsonData;
-  }
-  
+  static float IMU_data[9] = {AccX, AccY, AccZ, GyroX, GyroY, GyroZ, roll, pitch, yaw};
+  //String jsonData = getSensorDataJson(AccX, AccY, AccZ, GyroX, GyroY, GyroZ, roll, pitch, yaw);
+  return IMU_data;
 }
 
-char* getSensorDataJson(float AccX, float AccY, float AccZ, 
-                        float GyroX, float GyroY, float GyroZ, 
-                        float roll, float pitch, float yaw) {
-  // Allocate memory for the JSON string (adjust size if needed)
-  char* jsonStr = (char*)malloc(256); // Allocate enough memory for the JSON string
-  
-  if (jsonStr == NULL) {
-    return NULL; // Return NULL if memory allocation fails
-  }
-  
-  // Create the JSON string
-  snprintf(jsonStr, 256, 
-           "{"
-           "\"AccX\":%.3f,"
-           "\"AccY\":%.3f,"
-           "\"AccZ\":%.3f,"
-           "\"GyroX\":%.3f,"
-           "\"GyroY\":%.3f,"
-           "\"GyroZ\":%.3f,"
-           "\"roll\":%.3f,"
-           "\"pitch\":%.3f,"
-           "\"yaw\":%.3f"
-           "}",
-           AccX, AccY, AccZ, 
-           GyroX, GyroY, GyroZ, 
-           roll, pitch, yaw);
-  
-  return jsonStr; // Return the JSON string
+String IMU::getSensorDataJson(float AccX, float AccY, float AccZ, 
+                               float GyroX, float GyroY, float GyroZ, 
+                               float roll, float pitch, float yaw) {
+    Serial.print(AccX);
+    Serial.print(", ");
+    Serial.print(AccY);
+    Serial.print(", ");
+    Serial.print(AccZ);
+    Serial.print(", ");
+    Serial.print(GyroX);
+    Serial.print(", ");
+    Serial.print(GyroY);
+    Serial.print(", ");
+    Serial.print(GyroZ);
+    Serial.print(", ");
+    Serial.print(roll);
+    Serial.print(", ");
+    Serial.print(pitch);
+    Serial.print(", ");
+    Serial.println(yaw); 
+    char temp[100];
+    int lena = snprintf(temp, sizeof(temp), 
+                       "AccX : %.1f", AccX);
+    Serial.println(lena);
+    Serial.println(temp);
+    
+    // Temporarily allocate a buffer to get the required length for snprintf
+    char tempBuffer[256]; // Temporary buffer for snprintf
+    
+    // Create the JSON string in the temporary buffer to get the length
+    int len = snprintf(tempBuffer, sizeof(tempBuffer), 
+                       "{"
+                       "\"AccX\":%.3f,"
+                       "\"AccY\":%.3f,"
+                       "\"AccZ\":%.3f,"
+                       "\"GyroX\":%.3f,"
+                       "\"GyroY\":%.3f,"
+                       "\"GyroZ\":%.3f,"
+                       "\"roll\":%.3f,"
+                       "\"pitch\":%.3f,"
+                       "\"yaw\":%.3f"
+                       "}",
+                       AccX, AccY, AccZ, 
+                       GyroX, GyroY, GyroZ, 
+                       roll, pitch, yaw);
+    //Serial.println(len);
+    if (len < 0) {
+        return ""; // Error in snprintf
+    }
+    //Serial.println(tempBuffer);
+    // Create the JSON string directly using String class
+    String jsonStr = String(tempBuffer); // Create a String from the temporary buffer
+   // Serial.println(jsonStr);
+    return jsonStr; // Return the JSON string
 }
-
 
 
 void IMU::calculate_IMU_error() {

@@ -2,6 +2,8 @@
 #include "IRSensor.h"
 #include "USSensor.h"
 #include "Servo.h"
+//#include "IMU.h"
+
 
 // Create the servo object
 Servo myservo;
@@ -21,17 +23,24 @@ USSensor USSensorF(trigPin, echoPin, us_threshold);
 IRSensor IRSensorL(28, ir_thresholdLeft); // PE2 28
 IRSensor IRSensorR(26, ir_thresholdRight); //PE3 26
 
+// Create the IMU object
+/* IMU imu = IMU(); 
+char* IMU_data;
+float* data;*/
+
 unsigned long previousMillis = 0;
 unsigned long actionStartTime = 0;
 const long interval = 100;  // Time between movement updates in milliseconds
 
-enum RobotState { MOVING_FORWARD, REVERSING, STOPPED };
+enum RobotState { MOVING_FORWARD, REVERSING, STOPPED, WAITING_INSTRUCTIONS };
 RobotState currentState = MOVING_FORWARD;
 
 void setup() {
+  Serial2.begin(9600); // UART2 (PD6 = RX, PD7 = TX) baud rate must match ESP32's Serial baud rate
   Serial.begin(9600); 
   myservo.attach(servo_pin); // attach the servo to our servo object
   myservo.write(90);
+//  imu.initialize();
   motorInit();  // Initialize motor control pins
   driveForward(100);  // Start moving forward initially
   Serial.println("Robot initialized, moving forward.");
@@ -43,7 +52,14 @@ void loop() {
   //myservo.write(70);
   //delay(1000);
   //myservo.write(60);
-  
+ /* if currentState != WAITING_INSTRUCTIONS;{
+    data = imu.get_data();
+    for (int i = 0; i < 9; i++) {
+      Serial2.println(data[i]); 
+    }
+    //Serial2.println(IMU_data);
+  }*/
+
   unsigned long currentMillis = millis();  // Get the current time
   // Check sensors
   bool isEdgeDetectedLeft = IRSensorL.edgeDetected();
@@ -83,6 +99,7 @@ void loop() {
         Serial.println("Finished reversing, stopping the car.");
         delay(100);  // Small pause to ensure full stop
         currentState = STOPPED;  // Transition to stopped state
+        //currentState = WAITING_INSTRUCTIONS; 
       }
       break;
 
@@ -110,8 +127,28 @@ void loop() {
       }else{
         Serial.println("Resuming forward movement.");
         driveForward(100);  // Resume forward movement
-        currentState = MOVING_FORWARD; 
       }
       break;
+
+    case WAITING_INSTRUCTIONS:
+      Serial.println("Waiting for instructions");
+      Serial2.println("EK-TM4C123GXL stopped and waiting for instructions");
+      delay(2000); // Wait for data to be send before receiving
+
+       // Check if data is available on UART2
+      if (Serial2.available() > 0) {
+        String receivedData = "";
+
+        Serial.println("Received instructions: ");
+        // Read the incoming string until a newline character or timeout
+        while (Serial2.available() > 0) {
+          Serial.println(Serial2.readString()); // Read one character from UART2 
+          delay(5);                // Small delay for stable data reception
+        }
+      }else{
+        delay(500); // Don't read constantly
+      }  
+      break;
+
   }
 }
